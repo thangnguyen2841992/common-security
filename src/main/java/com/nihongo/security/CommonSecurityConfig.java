@@ -15,7 +15,7 @@ public class CommonSecurityConfig {
                 new JwtAuthenticationConverter();
 
         converter.setJwtGrantedAuthoritiesConverter(
-                new KeycloakRoleConverter()
+                new JwtRoleConverter()
         );
 
         return converter;
