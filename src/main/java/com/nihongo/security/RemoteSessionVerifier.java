@@ -1,0 +1,9 @@
+package com.nihongo.security;
+import org.springframework.security.oauth2.jwt.Jwt;import org.springframework.core.env.Environment;import java.net.*;import java.net.http.*;import java.time.Duration;import java.util.*;
+public final class RemoteSessionVerifier {
+ private final HttpClient client;private final URI validate,batch;private final InternalCredentials internal;
+ public RemoteSessionVerifier(Environment env,InternalCredentials internal){this.internal=internal;client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).followRedirects(HttpClient.Redirect.NEVER).build();validate=URI.create(env.getProperty("auth.session-validation-url","http://127.0.0.1:8081/api/auth/session/validate"));batch=URI.create(env.getProperty("auth.session-batch-url","http://127.0.0.1:8081/api/auth/internal/sessions/check"));}
+ public int status(Jwt jwt){try{return client.send(HttpRequest.newBuilder(validate).timeout(Duration.ofSeconds(2)).header("Authorization","Bearer "+jwt.getTokenValue()).header(InternalCredentials.HEADER,internal.value()).GET().build(),HttpResponse.BodyHandlers.discarding()).statusCode();}catch(InterruptedException e){Thread.currentThread().interrupt();return 503;}catch(Exception e){return 503;}}
+ public record SessionRef(String userId,String sessionId,List<String> roles){}
+ public String checkBatch(String json){try{var r=client.send(HttpRequest.newBuilder(batch).timeout(Duration.ofSeconds(2)).header(InternalCredentials.HEADER,internal.value()).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(json)).build(),HttpResponse.BodyHandlers.ofString());if(r.statusCode()!=200)throw new IllegalStateException("Session verification unavailable");return r.body();}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException("Session verification unavailable",e);}catch(Exception e){throw new IllegalStateException("Session verification unavailable",e);}}
+}

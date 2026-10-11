@@ -10,12 +10,17 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 
 @Configuration(proxyBeanMethods = false)
 public class CommonSecurityConfig {
+    @Bean public org.springframework.beans.factory.InitializingBean productionSecurityPolicy(org.springframework.core.env.Environment env){return ()->ProductionSecurityPolicy.verify(env);}
+    @Bean public InternalCredentials internalCredentials(org.springframework.core.env.Environment env){return new InternalCredentials(env);}
+    @Bean public BrowserOriginPolicy browserOriginPolicy(@Value("${FRONTEND_ORIGIN:http://localhost:5173}") String[] origins){return new BrowserOriginPolicy(origins);}
+    @Bean public RemoteSessionVerifier remoteSessionVerifier(org.springframework.core.env.Environment env,InternalCredentials credentials){return new RemoteSessionVerifier(env,credentials);}
+    @Bean public SocketSessionRegistry socketSessionRegistry(RemoteSessionVerifier verifier,org.springframework.core.env.Environment env){return new SocketSessionRegistry(verifier,env);}
 
     @Bean
     public Request.Options feignRequestOptions(
             @Value("${services.http.connect-timeout-ms:3000}") long connectTimeout,
             @Value("${services.http.read-timeout-ms:10000}") long readTimeout) {
-        return new Request.Options(connectTimeout, TimeUnit.MILLISECONDS, readTimeout, TimeUnit.MILLISECONDS, true);
+        return new Request.Options(connectTimeout, TimeUnit.MILLISECONDS, readTimeout, TimeUnit.MILLISECONDS, false);
     }
 
     @Bean
