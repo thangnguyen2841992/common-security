@@ -12,7 +12,8 @@ class FeignTimeoutTest {
     void internalCallsHaveBoundedTimeoutsAndAllowDeploymentOverrides() {
         try (var context = new AnnotationConfigApplicationContext()) {
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test", Map.of(
-                    "services.http.connect-timeout-ms", "1200", "services.http.read-timeout-ms", "4500")));
+                    "services.http.connect-timeout-ms", "1200", "services.http.read-timeout-ms", "4500",
+                    "security.internal.key", java.util.Base64.getEncoder().encodeToString(new byte[32]))));
             context.register(CommonSecurityConfig.class);
             context.refresh();
             var options = context.getBean(Request.Options.class);
