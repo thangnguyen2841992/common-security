@@ -15,8 +15,11 @@ public final class SocketSessionRegistry implements DisposableBean {
  private record Watched(WebSocketSession socket,RemoteSessionVerifier.SessionRef ref){}
  private final Map<String,Watched> sockets=new ConcurrentHashMap<>();
  private final RemoteSessionVerifier verifier;private final ObjectMapper json=new ObjectMapper();private final ScheduledExecutorService timer;private final boolean enabled;
- public SocketSessionRegistry(RemoteSessionVerifier verifier,Environment env){this(verifier,env.getProperty("security.session-validation.enabled",Boolean.class,true),true);}
- public SocketSessionRegistry(RemoteSessionVerifier verifier,boolean enabled,boolean automatic){this.verifier=verifier;this.enabled=enabled;if(enabled&&automatic){timer=Executors.newSingleThreadScheduledExecutor(r->{var t=new Thread(r,"socket-session-check");t.setDaemon(true);return t;});timer.scheduleWithFixedDelay(this::checkNow,500,500,TimeUnit.MILLISECONDS);}else timer=null;}
+ // Default 5s: one batched shared-store check per service instance, instead of two per second.
+ public static final long DEFAULT_CHECK_INTERVAL_MILLIS=5000;
+ public SocketSessionRegistry(RemoteSessionVerifier verifier,Environment env){this(verifier,env.getProperty("security.session-validation.enabled",Boolean.class,true),true,env.getProperty("security.socket-session-check-ms",Long.class,DEFAULT_CHECK_INTERVAL_MILLIS));}
+ public SocketSessionRegistry(RemoteSessionVerifier verifier,boolean enabled,boolean automatic){this(verifier,enabled,automatic,DEFAULT_CHECK_INTERVAL_MILLIS);}
+ public SocketSessionRegistry(RemoteSessionVerifier verifier,boolean enabled,boolean automatic,long intervalMillis){this.verifier=verifier;this.enabled=enabled;long interval=Math.max(500,intervalMillis);if(enabled&&automatic){timer=Executors.newSingleThreadScheduledExecutor(r->{var t=new Thread(r,"socket-session-check");t.setDaemon(true);return t;});timer.scheduleWithFixedDelay(this::checkNow,interval,interval,TimeUnit.MILLISECONDS);}else timer=null;}
  public WebSocketHandler decorate(WebSocketHandler handler){if(!enabled)return handler;return new WebSocketHandlerDecorator(handler){
   @Override public void afterConnectionEstablished(WebSocketSession socket)throws Exception{
    if(!(socket.getPrincipal() instanceof JwtAuthenticationToken auth)||!"access".equals(auth.getToken().getClaimAsString("type"))||auth.getToken().getExpiresAt()==null||!auth.getToken().getExpiresAt().isAfter(Instant.now())){events.warn("event=rejected socketId={} reason=invalid-token",socket.getId());socket.close(CloseStatus.POLICY_VIOLATION);return;}
